@@ -6,7 +6,6 @@ import de.keksuccino.fancymenu.customization.element.AbstractElement;
 import de.keksuccino.fancymenu.customization.element.ElementBuilder;
 import de.keksuccino.fancymenu.customization.element.ExecutableElement;
 import de.keksuccino.fancymenu.util.rendering.DrawableColor;
-import de.keksuccino.fancymenu.util.rendering.RenderingUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import org.jetbrains.annotations.NotNull;
@@ -14,8 +13,6 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.*;
 
 public class TickerElement extends AbstractElement implements ExecutableElement {
-
-    private static final DrawableColor BACKGROUND_COLOR = DrawableColor.of(Color.ORANGE);
 
     @NotNull
     public volatile GenericExecutableBlock actionExecutor = new GenericExecutableBlock();
@@ -64,7 +61,7 @@ public class TickerElement extends AbstractElement implements ExecutableElement 
             int w = this.getAbsoluteWidth();
             int h = this.getAbsoluteHeight();
             RenderSystem.enableBlend();
-            graphics.fill(x, y, x + w, y + h, BACKGROUND_COLOR.getColorInt());
+            graphics.fill(RenderType.guiOverlay(), x, y, x + w, y + h, this.inEditorColor.getColorInt());
             graphics.enableScissor(x, y, x + w, y + h);
             graphics.drawCenteredString(Minecraft.getInstance().font, this.getDisplayName(), x + (w / 2), y + (h / 2) - (Minecraft.getInstance().font.lineHeight / 2), -1);
             graphics.disableScissor();
