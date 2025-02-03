@@ -1,25 +1,19 @@
 package de.keksuccino.fancymenu.util.rendering;
 
-import com.google.gson.JsonSyntaxException;
-import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import de.keksuccino.fancymenu.mixin.mixins.common.client.IMixinGameRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.PostChain;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FastColor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import java.awt.*;
-import java.util.function.Function;
+import java.util.Objects;
 
 public class RenderingUtils {
 
@@ -28,177 +22,6 @@ public class RenderingUtils {
     public static final DrawableColor MISSING_TEXTURE_COLOR_MAGENTA = DrawableColor.of(Color.MAGENTA);
     public static final DrawableColor MISSING_TEXTURE_COLOR_BLACK = DrawableColor.BLACK;
     public static final ResourceLocation FULLY_TRANSPARENT_TEXTURE = ResourceLocation.fromNamespaceAndPath("fancymenu", "textures/fully_transparent.png");
-    public static final ResourceLocation BLUR_LOCATION = ResourceLocation.parse("shaders/post/blur.json");
-
-    public static PostChain blurEffect = null;
-
-    //Generated with GPT-o1 for testing purposes
-    public static void renderBlurredArea(GuiGraphics graphics, int x, int y, int width, int height, float partialTicks, int blurRadius) {
-
-        Minecraft minecraft = Minecraft.getInstance();
-
-        RenderSystem.backupProjectionMatrix();
-
-        // Define margin based on blur radius
-        int margin = blurRadius * 2;
-
-        // Adjusted area to capture
-        int captureX = x - margin;
-        int captureY = y - margin;
-        int captureWidth = width + margin * 2;
-        int captureHeight = height + margin * 2;
-
-        // Ensure the capture area is within screen bounds
-        int screenWidth = minecraft.getWindow().getGuiScaledWidth();
-        int screenHeight = minecraft.getWindow().getGuiScaledHeight();
-
-        captureX = Math.max(0, captureX);
-        captureY = Math.max(0, captureY);
-        captureWidth = Math.min(captureWidth, screenWidth - captureX);
-        captureHeight = Math.min(captureHeight, screenHeight - captureY);
-
-        // Step 1: Create a TextureTarget for the blur effect
-        TextureTarget blurRenderTarget = new TextureTarget(captureWidth, captureHeight, true, Minecraft.ON_OSX);
-        blurRenderTarget.setClearColor(0, 0, 0, 0);
-        blurRenderTarget.clear(true);
-
-        // Step 2: Bind the RenderTarget
-        blurRenderTarget.bindWrite(true);
-
-        // Step 3: Set up the projection matrix for rendering to the RenderTarget
-        RenderSystem.setProjectionMatrix(new Matrix4f().setOrtho(0.0F, (float)captureWidth, (float)captureHeight, 0.0F, 1000.0F, 3000.0F), VertexSorting.ORTHOGRAPHIC_Z);
-        RenderSystem.applyModelViewMatrix();
-
-        // Step 4: Copy the area from the main RenderTarget to the blurRenderTarget
-        // Bind the main RenderTarget's texture
-        RenderSystem.setShaderTexture(0, minecraft.getMainRenderTarget().getColorTextureId());
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-
-        // Draw the textured quad to the blurRenderTarget
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder bufferBuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-
-        float u0 = (float)captureX / (float)screenWidth;
-        float v0 = (float)captureY / (float)screenHeight;
-        float u1 = (float)(captureX + captureWidth) / (float)screenWidth;
-        float v1 = (float)(captureY + captureHeight) / (float)screenHeight;
-
-        // Add vertices
-        bufferBuilder.addVertex(0.0F, (float)captureHeight, 0.0F).setUv(u0, v1);
-        bufferBuilder.addVertex((float)captureWidth, (float)captureHeight, 0.0F).setUv(u1, v1);
-        bufferBuilder.addVertex((float)captureWidth, 0.0F, 0.0F).setUv(u1, v0);
-        bufferBuilder.addVertex(0.0F, 0.0F, 0.0F).setUv(u0, v0);
-
-        // Build the mesh and draw it
-        MeshData meshData = bufferBuilder.buildOrThrow();
-        BufferUploader.drawWithShader(meshData);
-
-        // Step 5: Apply the blur shader to the RenderTarget
-        PostChain blurEffect = ((IMixinGameRenderer)Minecraft.getInstance().gameRenderer).getBlurEffect_FancyMenu();
-        if (blurEffect != null) {
-            blurEffect.resize(captureWidth, captureHeight);
-            blurEffect.setUniform("Radius", (float)blurRadius);
-            blurEffect.process(partialTicks);
-        }
-
-        // Step 6: Unbind the RenderTarget
-        blurRenderTarget.unbindWrite();
-
-        // Restore the original projection matrix
-        Window window = minecraft.getWindow();
-        RenderSystem.setProjectionMatrix(new Matrix4f().setOrtho(0.0F, (float)window.getGuiScaledWidth(), (float)window.getGuiScaledHeight(), 0.0F, 1000.0F, 3000.0F), VertexSorting.ORTHOGRAPHIC_Z);
-        RenderSystem.applyModelViewMatrix();
-
-        // Step 7: Render the blurred texture back onto the screen at (x, y)
-        minecraft.getMainRenderTarget().bindWrite(false);
-
-        // Set up rendering state
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-
-        // Bind the blurred texture
-        RenderSystem.setShaderTexture(0, blurRenderTarget.getColorTextureId());
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-
-        // Draw the textured quad at (x, y) with size (width, height)
-        // Using texture coordinates to exclude the margins
-        float texU0 = (float)margin / (float)captureWidth;
-        float texV0 = (float)margin / (float)captureHeight;
-        float texU1 = (float)(margin + width) / (float)captureWidth;
-        float texV1 = (float)(margin + height) / (float)captureHeight;
-
-        // Prepare for rendering on the main screen
-        bufferBuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-
-        PoseStack poseStack = graphics.pose();
-        poseStack.pushPose();
-        poseStack.translate((float)x, (float)y, 0.0F);
-
-        Matrix4f screenMatrix = poseStack.last().pose();
-
-        bufferBuilder.addVertex(screenMatrix, 0.0F, (float)height, 0.0F).setUv(texU0, texV1);
-        bufferBuilder.addVertex(screenMatrix, (float)width, (float)height, 0.0F).setUv(texU1, texV1);
-        bufferBuilder.addVertex(screenMatrix, (float)width, 0.0F, 0.0F).setUv(texU1, texV0);
-        bufferBuilder.addVertex(screenMatrix, 0.0F, 0.0F, 0.0F).setUv(texU0, texV0);
-
-        MeshData screenMeshData = bufferBuilder.buildOrThrow();
-        BufferUploader.drawWithShader(screenMeshData);
-
-        poseStack.popPose();
-
-        // Cleanup
-        RenderSystem.disableBlend();
-        blurRenderTarget.destroyBuffers();
-
-        RenderSystem.restoreProjectionMatrix();
-        RenderSystem.applyModelViewMatrix();
-
-    }
-
-    /**
-     * This is just for playing around with the blur effect and is not working correctly yet.
-     */
-    @ApiStatus.Experimental
-    public static void processBlurEffect(@NotNull GuiGraphics graphics, int x, int y, int width, int height, float partial, float blurriness) {
-
-        // shader seems to render dark out-of-screen edges of top and bottom of screen (because nothing is rendered out-of-screen)
-
-        if (blurEffect == null) reloadBlurShader();
-
-        RenderSystem.enableBlend();
-
-        float _blurriness = blurriness * 10.0F;
-        if (blurEffect != null && (_blurriness >= 1.0F)) {
-            graphics.enableScissor(x, y, x + width, y + height);
-            blurEffect.setUniform("Radius", _blurriness);
-            blurEffect.process(partial);
-            graphics.disableScissor();
-        }
-
-        Minecraft.getInstance().getMainRenderTarget().bindWrite(false);
-
-        RenderSystem.disableBlend();
-
-    }
-
-    /**
-     * This is just for playing around with the blur effect and is not working correctly yet.
-     */
-    @ApiStatus.Experimental
-    public static void reloadBlurShader() {
-        if (blurEffect != null) {
-            blurEffect.close();
-        }
-        try {
-            GameRenderer.ResourceCache cache = new GameRenderer.ResourceCache(Minecraft.getInstance().getResourceManager(), new HashMap<>());
-            blurEffect = new PostChain(Minecraft.getInstance().getTextureManager(), cache, Minecraft.getInstance().getMainRenderTarget(), BLUR_LOCATION);
-            blurEffect.resize(Minecraft.getInstance().getWindow().getWidth(), Minecraft.getInstance().getWindow().getHeight());
-        } catch (IOException ex) {
-            LOGGER.warn("Failed to load shader: {}", BLUR_LOCATION, ex);
-        } catch (JsonSyntaxException var4) {
-            LOGGER.warn("Failed to parse shader: {}", BLUR_LOCATION, var4);
-        }
-    }
 
     public static void renderMissing(@NotNull GuiGraphics graphics, int x, int y, int width, int height) {
         int partW = width / 2;
@@ -227,52 +50,12 @@ public class RenderingUtils {
      */
     public static void blitRepeat(@NotNull GuiGraphics graphics, @NotNull ResourceLocation location, int x, int y, int areaRenderWidth, int areaRenderHeight, int texWidth, int texHeight) {
         graphics.blit(location, x, y, 0.0F, 0.0F, areaRenderWidth, areaRenderHeight, texWidth, texHeight);
-        //blitRepeat(graphics, location, x, y, areaRenderWidth, areaRenderHeight, texWidth, texHeight, 0, 0, texWidth, texHeight, texWidth, texHeight);
-    }
-
-    /**
-     * Repeatedly renders a tileable (seamless) texture inside an area. Fills the area with the texture.
-     *
-     * @param graphics The {@link GuiGraphics} instance.
-     * @param renderType The render type.
-     * @param location The {@link ResourceLocation} of the texture.
-     * @param x The X position the area should get rendered at.
-     * @param y The Y position the area should get rendered at.
-     * @param areaRenderWidth The width of the area.
-     * @param areaRenderHeight The height of the area.
-     * @param texWidth The full width (in pixels) of the texture.
-     * @param texHeight The full height (in pixels) of the texture.
-     */
-    public static void blitRepeat(@NotNull GuiGraphics graphics, @NotNull ResourceLocation location, int x, int y, int areaRenderWidth, int areaRenderHeight, int texRenderWidth, int texRenderHeight, int texOffsetX, int texOffsetY, int texPartWidth, int texPartHeight, int texWidth, int texHeight) {
-
-        Objects.requireNonNull(graphics);
-        Objects.requireNonNull(location);
-        if ((areaRenderWidth <= 0) || (areaRenderHeight <= 0) || (texRenderWidth <= 0) || (texRenderHeight <= 0) || (texPartWidth <= 0) || (texPartHeight <= 0)) return;
-
-        int repeatsHorizontal = Math.max(1, (areaRenderWidth / texPartWidth));
-        if ((texPartWidth * repeatsHorizontal) < areaRenderWidth) repeatsHorizontal++;
-        int repeatsVertical = Math.max(1, (areaRenderHeight / texPartHeight));
-        if ((texPartHeight * repeatsVertical) < areaRenderHeight) repeatsVertical++;
-
-        graphics.enableScissor(x, y, x + areaRenderWidth, y + areaRenderHeight);
-
-        for (int horizontal = 0; horizontal < repeatsHorizontal; horizontal++) {
-            for (int vertical = 0; vertical < repeatsVertical; vertical++) {
-                int renderX = x + (texPartWidth * horizontal);
-                int renderY = y + (texPartHeight * vertical);
-                graphics.blit(location, renderX, renderY, texRenderWidth, texRenderHeight, (float)texOffsetX, (float)texOffsetY, texPartWidth, texPartHeight, texWidth, texHeight);
-            }
-        }
-
-        blitNineSlicedTexture(graphics, RenderType::guiTextured, texture, x, y, width, height, textureWidth, textureHeight, borderTop, borderRight, borderBottom, borderLeft, color);
-
     }
 
     /**
      * Renders a texture using nine-slice scaling with tiled edges and center.
      *
      * @param graphics The GuiGraphics instance to use for rendering
-     * @param renderType The render type.
      * @param texture The texture ResourceLocation to render
      * @param x The x position to render at
      * @param y The y position to render at
@@ -284,21 +67,20 @@ public class RenderingUtils {
      * @param borderRight The size of the right border
      * @param borderBottom The size of the bottom border
      * @param borderLeft The size of the left border
-     * @param color The color to tint the texture with
      */
-    public static void blitNineSlicedTexture(GuiGraphics graphics, @NotNull Function<ResourceLocation, RenderType> renderType, ResourceLocation texture, int x, int y, int width, int height,
+    public static void blitNineSlicedTexture(@NotNull GuiGraphics graphics, @NotNull ResourceLocation texture, int x, int y, int width, int height,
                                int textureWidth, int textureHeight,
-                               int borderTop, int borderRight, int borderBottom, int borderLeft, int color) {
+                               int borderTop, int borderRight, int borderBottom, int borderLeft) {
 
         // Corner pieces
         // Top left
-        graphics.blit(renderType, texture, x, y, 0, 0, borderLeft, borderTop, textureWidth, textureHeight, color);
+        graphics.blit(texture, x, y, 0, 0, borderLeft, borderTop, textureWidth, textureHeight);
         // Top right
-        graphics.blit(renderType, texture, x + width - borderRight, y, textureWidth - borderRight, 0, borderRight, borderTop, textureWidth, textureHeight, color);
+        graphics.blit(texture, x + width - borderRight, y, textureWidth - borderRight, 0, borderRight, borderTop, textureWidth, textureHeight);
         // Bottom left
-        graphics.blit(renderType, texture, x, y + height - borderBottom, 0, textureHeight - borderBottom, borderLeft, borderBottom, textureWidth, textureHeight, color);
+        graphics.blit(texture, x, y + height - borderBottom, 0, textureHeight - borderBottom, borderLeft, borderBottom, textureWidth, textureHeight);
         // Bottom right
-        graphics.blit(renderType, texture, x + width - borderRight, y + height - borderBottom, textureWidth - borderRight, textureHeight - borderBottom, borderRight, borderBottom, textureWidth, textureHeight, color);
+        graphics.blit(texture, x + width - borderRight, y + height - borderBottom, textureWidth - borderRight, textureHeight - borderBottom, borderRight, borderBottom, textureWidth, textureHeight);
 
         // Edges - Tiled
         int centerWidth = textureWidth - borderLeft - borderRight;
@@ -307,25 +89,25 @@ public class RenderingUtils {
         // Top edge
         for (int i = borderLeft; i < width - borderRight; i += centerWidth) {
             int pieceWidth = Math.min(centerWidth, width - borderRight - i);
-            graphics.blit(renderType, texture, x + i, y, borderLeft, 0, pieceWidth, borderTop, textureWidth, textureHeight, color);
+            graphics.blit(texture, x + i, y, borderLeft, 0, pieceWidth, borderTop, textureWidth, textureHeight);
         }
 
         // Bottom edge
         for (int i = borderLeft; i < width - borderRight; i += centerWidth) {
             int pieceWidth = Math.min(centerWidth, width - borderRight - i);
-            graphics.blit(renderType, texture, x + i, y + height - borderBottom, borderLeft, textureHeight - borderBottom, pieceWidth, borderBottom, textureWidth, textureHeight, color);
+            graphics.blit(texture, x + i, y + height - borderBottom, borderLeft, textureHeight - borderBottom, pieceWidth, borderBottom, textureWidth, textureHeight);
         }
 
         // Left edge
         for (int j = borderTop; j < height - borderBottom; j += centerHeight) {
             int pieceHeight = Math.min(centerHeight, height - borderBottom - j);
-            graphics.blit(renderType, texture, x, y + j, 0, borderTop, borderLeft, pieceHeight, textureWidth, textureHeight, color);
+            graphics.blit(texture, x, y + j, 0, borderTop, borderLeft, pieceHeight, textureWidth, textureHeight);
         }
 
         // Right edge
         for (int j = borderTop; j < height - borderBottom; j += centerHeight) {
             int pieceHeight = Math.min(centerHeight, height - borderBottom - j);
-            graphics.blit(renderType, texture, x + width - borderRight, y + j, textureWidth - borderRight, borderTop, borderRight, pieceHeight, textureWidth, textureHeight, color);
+            graphics.blit(texture, x + width - borderRight, y + j, textureWidth - borderRight, borderTop, borderRight, pieceHeight, textureWidth, textureHeight);
         }
 
         // Center - Tiled
@@ -333,7 +115,7 @@ public class RenderingUtils {
             int pieceWidth = Math.min(centerWidth, width - borderRight - i);
             for (int j = borderTop; j < height - borderBottom; j += centerHeight) {
                 int pieceHeight = Math.min(centerHeight, height - borderBottom - j);
-                graphics.blit(renderType, texture, x + i, y + j, borderLeft, borderTop, pieceWidth, pieceHeight, textureWidth, textureHeight, color);
+                graphics.blit(texture, x + i, y + j, borderLeft, borderTop, pieceWidth, pieceHeight, textureWidth, textureHeight);
             }
         }
 
@@ -357,7 +139,6 @@ public class RenderingUtils {
         m.setGuiScale(m.calculateScale(Minecraft.getInstance().options.guiScale().get(), Minecraft.getInstance().options.forceUnicodeFont().get()));
     }
 
-<<<<<<< HEAD
     public static void resetShaderColor(GuiGraphics graphics) {
         graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
@@ -376,8 +157,6 @@ public class RenderingUtils {
         graphics.setColor(r, g, b, alpha);
     }
 
-=======
->>>>>>> 55affb8... v3.4.0 - 1.21.4
     /**
      * @param color The color.
      * @param newAlpha Value between 0 and 255.

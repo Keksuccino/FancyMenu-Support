@@ -16,8 +16,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -76,7 +76,8 @@ public class ItemElement extends AbstractElement {
 
             if ((this.cachedStack == null) || !keyFinal.equals(this.lastItemKey) || (this.enchanted != this.lastEnchanted) || !Objects.equals(loreFinal, this.lastLore) || !Objects.equals(nameFinal, this.lastItemName) || !Objects.equals(nbtFinal, this.lastNbtData)) {
 
-                Item item = BuiltInRegistries.ITEM.getValue(ResourceLocation.parse(keyFinal));
+                Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(keyFinal));
+
                 this.cachedStack = new ItemStack(item);
                 this.cachedStack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, this.enchanted);
 
@@ -164,17 +165,16 @@ public class ItemElement extends AbstractElement {
     protected void _renderItem(@NotNull GuiGraphics graphics, int x, int y, int size, int seed, @NotNull ItemStack itemStack) {
         int guiOffset = 0;
         PoseStack pose = graphics.pose();
-        ItemStackRenderState scratchItemStackRenderState = ((IMixinGuiGraphics)graphics).get_scratchItemStackRenderState_FancyMenu();
+        BakedModel model = Minecraft.getInstance().getItemRenderer().getModel(itemStack, null, null, seed);
         if (!itemStack.isEmpty()) {
             // Calculate the scaling factor based on the requested size (maintaining aspect ratio)
             float scaleFactor = size / 16.0F;  // Convert from the original 16x16 base size
-            Minecraft.getInstance().getItemModelResolver().updateForTopItem(scratchItemStackRenderState, itemStack, ItemDisplayContext.GUI, false, null, null, seed);
             pose.pushPose();
             // Adjust translation to account for new size (center point needs to scale with size)
             pose.translate(
                     (float)(x + size/2),  // Center point X scales with size
                     (float)(y + size/2),  // Center point Y scales with size
-                    (float)(150 + (scratchItemStackRenderState.isGui3d() ? guiOffset : 0))
+                    (float)(150 + (model.isGui3d() ? guiOffset : 0))
             );
             try {
                 // Apply scaled transformation while maintaining aspect ratio
@@ -183,12 +183,12 @@ public class ItemElement extends AbstractElement {
                         -16.0F * scaleFactor,   // Height scaling (negative for Y-axis orientation)
                         16.0F                   // Keep Z scale constant
                 );
-                boolean bl = !scratchItemStackRenderState.usesBlockLight();
+                boolean bl = !model.usesBlockLight();
                 if (bl) {
                     graphics.flush();
                     Lighting.setupForFlatItems();
                 }
-                scratchItemStackRenderState.render(pose, ((IMixinGuiGraphics)graphics).getBufferSource_FancyMenu(), 15728880, OverlayTexture.NO_OVERLAY);
+                Minecraft.getInstance().getItemRenderer().render(itemStack, ItemDisplayContext.GUI, false, graphics.pose(), ((IMixinGuiGraphics)graphics).getBufferSource_FancyMenu(), 15728880, OverlayTexture.NO_OVERLAY, model);
                 graphics.flush();
                 if (bl) {
                     Lighting.setupFor3DItems();
@@ -230,7 +230,7 @@ public class ItemElement extends AbstractElement {
     }
 
     protected void renderItemTooltip(@NotNull GuiGraphics graphics, int mouseX, int mouseY, @NotNull ItemStack itemStack) {
-        graphics.renderTooltip(this.font, Screen.getTooltipFromItem(Minecraft.getInstance(), itemStack), itemStack.getTooltipImage(), mouseX, mouseY, itemStack.get(DataComponents.TOOLTIP_STYLE));
+        graphics.renderTooltip(this.font, Screen.getTooltipFromItem(Minecraft.getInstance(), itemStack), itemStack.getTooltipImage(), mouseX, mouseY);
     }
 
 }

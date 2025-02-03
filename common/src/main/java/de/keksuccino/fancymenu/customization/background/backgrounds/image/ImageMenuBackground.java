@@ -37,6 +37,7 @@ public class ImageMenuBackground extends MenuBackground {
 
     @Override
     public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partial) {
+
         RenderSystem.enableBlend();
 
         ResourceLocation resourceLocation = null;
@@ -71,6 +72,9 @@ public class ImageMenuBackground extends MenuBackground {
                 renderFullScreen(graphics, resourceLocation, parallaxOffset);
             }
         }
+
+        RenderingUtils.resetShaderColor(graphics);
+
     }
 
     protected float[] calculateParallaxOffset(int mouseX, int mouseY) {
@@ -78,10 +82,6 @@ public class ImageMenuBackground extends MenuBackground {
             return new float[]{0, 0};
         }
 
-<<<<<<< HEAD
-        RenderingUtils.resetShaderColor(graphics);
-
-=======
         // Calculate mouse position as a percentage from the center of the screen
         float mouseXPercent = (2.0f * mouseX / getScreenWidth()) - 1.0f;
         float mouseYPercent = (2.0f * mouseY / getScreenHeight()) - 1.0f;
@@ -94,10 +94,13 @@ public class ImageMenuBackground extends MenuBackground {
         float yOffset = directionMultiplier * parallaxIntensity * mouseYPercent * getScreenHeight() * 0.5f;
 
         return new float[]{xOffset, yOffset};
->>>>>>> 55affb8... v3.4.0 - 1.21.4
+
     }
 
     protected void renderRepeatBackground(@NotNull GuiGraphics graphics, @NotNull ResourceLocation resourceLocation, ITexture tex, float[] parallaxOffset) {
+
+        graphics.setColor(1.0F, 1.0F, 1.0F, this.opacity);
+
         if (parallaxEnabled) {
             // Create expanded area for parallax movement
             int expandedWidth = (int)(getScreenWidth() * (1.0F + parallaxIntensity));
@@ -109,19 +112,21 @@ public class ImageMenuBackground extends MenuBackground {
 
             RenderingUtils.blitRepeat(graphics, resourceLocation, baseX, baseY,
                     expandedWidth, expandedHeight,
-                    tex.getWidth(), tex.getHeight(),
-                    DrawableColor.WHITE.getColorIntWithAlpha(this.opacity));
+                    tex.getWidth(), tex.getHeight());
         } else {
             RenderingUtils.blitRepeat(graphics, resourceLocation, 0, 0,
                     getScreenWidth(), getScreenHeight(),
-                    tex.getWidth(), tex.getHeight(),
-                    DrawableColor.WHITE.getColorIntWithAlpha(this.opacity));
+                    tex.getWidth(), tex.getHeight());
         }
+
+        RenderingUtils.resetShaderColor(graphics);
+
     }
 
     protected void renderSlideBackground(@NotNull GuiGraphics graphics, @NotNull AspectRatio ratio, @NotNull ResourceLocation resourceLocation, float[] parallaxOffset) {
         int w = ratio.getAspectRatioWidth(getScreenHeight());
         handleSlideAnimation(w);
+        graphics.setColor(1.0F, 1.0F, 1.0F, this.opacity);
         if (w <= getScreenWidth()) {
             if (this.keepBackgroundAspectRatio) {
                 renderKeepAspectRatio(graphics, ratio, resourceLocation, parallaxOffset);
@@ -130,11 +135,11 @@ public class ImageMenuBackground extends MenuBackground {
             }
         } else {
             float finalX = (float)slidePos;
-            RenderingUtils.blitF(graphics, RenderType::guiTextured, resourceLocation,
+            RenderingUtils.blitF(graphics, resourceLocation,
                     finalX, parallaxOffset[1], 0.0F, 0.0F,
-                    w, getScreenHeight(), w, getScreenHeight(),
-                    ARGB.white(this.opacity));
+                    w, getScreenHeight(), w, getScreenHeight());
         }
+        RenderingUtils.resetShaderColor(graphics);
     }
 
     protected void renderKeepAspectRatio(@NotNull GuiGraphics graphics, @NotNull AspectRatio ratio, @NotNull ResourceLocation resourceLocation, float[] parallaxOffset) {
@@ -149,14 +154,18 @@ public class ImageMenuBackground extends MenuBackground {
         int x = (getScreenWidth() - baseSize[0]) / 2 + (int)parallaxOffset[0];
         int y = (getScreenHeight() - baseSize[1]) / 2 + (int)parallaxOffset[1];
 
-        graphics.blit(RenderType::guiTextured, resourceLocation,
+        graphics.setColor(1.0F, 1.0F, 1.0F, this.opacity);
+
+        graphics.blit(resourceLocation,
                 x, y, 0.0F, 0.0F,
                 baseSize[0], baseSize[1],
-                baseSize[0], baseSize[1],
-                ARGB.white(this.opacity));
+                baseSize[0], baseSize[1]);
+
+        RenderingUtils.resetShaderColor(graphics);
     }
 
     protected void renderFullScreen(@NotNull GuiGraphics graphics, @NotNull ResourceLocation resourceLocation, float[] parallaxOffset) {
+        graphics.setColor(1.0F, 1.0F, 1.0F, this.opacity);
         if (parallaxEnabled) {
             // Reduce the expansion amount for parallax
             int expandedWidth = (int)(getScreenWidth() * (1.0F + parallaxIntensity));
@@ -166,18 +175,17 @@ public class ImageMenuBackground extends MenuBackground {
             int x = -((expandedWidth - getScreenWidth()) / 2) + (int)parallaxOffset[0];
             int y = -((expandedHeight - getScreenHeight()) / 2) + (int)parallaxOffset[1];
 
-            graphics.blit(RenderType::guiTextured, resourceLocation,
+            graphics.blit(resourceLocation,
                     x, y, 0.0F, 0.0F,
                     expandedWidth, expandedHeight,
-                    expandedWidth, expandedHeight,
-                    ARGB.white(this.opacity));
+                    expandedWidth, expandedHeight);
         } else {
-            graphics.blit(RenderType::guiTextured, resourceLocation,
+            graphics.blit(resourceLocation,
                     0, 0, 0.0F, 0.0F,
                     getScreenWidth(), getScreenHeight(),
-                    getScreenWidth(), getScreenHeight(),
-                    ARGB.white(this.opacity));
+                    getScreenWidth(), getScreenHeight());
         }
+        RenderingUtils.resetShaderColor(graphics);
     }
 
     protected void handleSlideAnimation(int backgroundWidth) {

@@ -165,11 +165,6 @@ public class MarkdownTextFragment implements Renderable, GuiEventListener {
     protected void renderBulletListDot(GuiGraphics graphics) {
         if ((this.bulletListLevel > 0) && this.bulletListItemStart) {
             RenderSystem.enableBlend();
-<<<<<<< HEAD
-            float yStart = this.getTextRenderY() + (this.getTextRenderHeight() / 2) - 2;
-            RenderingUtils.fillF(graphics, this.getTextRenderX() - BULLET_LIST_SPACE_AFTER_INDENT - 3, yStart, this.getTextRenderX() - BULLET_LIST_SPACE_AFTER_INDENT, yStart+3, this.parent.bulletListDotColor.getColorIntWithAlpha(this.parent.textOpacity));
-            RenderingUtils.resetShaderColor(graphics);
-=======
             final float scale = this.getScale();
 
             // Calculate dimensions using scale
@@ -184,7 +179,6 @@ public class MarkdownTextFragment implements Renderable, GuiEventListener {
             RenderingUtils.fillF(graphics, bulletX, textBaselineY, bulletX + bulletSize, textBaselineY + bulletSize,
                     this.parent.bulletListDotColor.getColorIntWithAlpha(this.parent.textOpacity)
             );
->>>>>>> 55affb8... v3.4.0 - 1.21.4
         }
     }
 
